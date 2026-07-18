@@ -1,33 +1,24 @@
-const CACHE = 'learning-asset-builder-v2';
-const ASSETS = [
-  './',
-  './index.html',
-  './src/main.js',
-  './src/styles.css'
-];
+const CACHE_PREFIX = 'learning-asset-builder';
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key.startsWith(CACHE_PREFIX)).map(key => caches.delete(key))
+    ))
+  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        const copy = response.clone();
-        caches.open(CACHE).then(cache => cache.put(event.request, copy));
-        return response;
-      });
-    })
+    Promise.all([
+      caches.keys().then(keys => Promise.all(
+        keys.filter(key => key.startsWith(CACHE_PREFIX)).map(key => caches.delete(key))
+      )),
+      self.registration.unregister(),
+      self.clients.matchAll({ type: 'window' }).then(clients => Promise.all(
+        clients.map(client => client.navigate(client.url))
+      ))
+    ])
   );
 });
